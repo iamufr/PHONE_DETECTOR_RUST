@@ -611,6 +611,12 @@ fn run_validation_tests() {
             description: "Formatted with dashes",
         },
         TestCase {
+            input: "123.456.7890",
+            expected_type: PhoneType::FormattedDomestic,
+            should_be_valid: true,
+            description: "Formatted with dots",
+        },
+        TestCase {
             input: "(012) 456-7890",
             expected_type: PhoneType::FormattedDomestic,
             should_be_valid: false,
@@ -623,7 +629,31 @@ fn run_validation_tests() {
             description: "Plain 10 digits",
         },
         TestCase {
+            input: "12345678901",
+            expected_type: PhoneType::Plain11Digit,
+            should_be_valid: true,
+            description: "Plain 11 digits with 1",
+        },
+        TestCase {
+            input: "0234567890",
+            expected_type: PhoneType::Plain10Digit,
+            should_be_valid: false,
+            description: "Invalid area code",
+        },
+        TestCase {
             input: "+1 123-456-7890",
+            expected_type: PhoneType::InternationalPlus,
+            should_be_valid: true,
+            description: "International format",
+        },
+        TestCase {
+            input: "+91 9876543210",
+            expected_type: PhoneType::InternationalPlus,
+            should_be_valid: true,
+            description: "International mobile format",
+        },
+        TestCase {
+            input: "+44 20 1234 5678",
             expected_type: PhoneType::InternationalPlus,
             should_be_valid: true,
             description: "International format",
@@ -633,6 +663,18 @@ fn run_validation_tests() {
             expected_type: PhoneType::Mobile10Digit,
             should_be_valid: true,
             description: "Mobile 10 digits",
+        },
+        TestCase {
+            input: "919876543210",
+            expected_type: PhoneType::Mobile10Digit,
+            should_be_valid: true,
+            description: "Mobile with country code",
+        },
+        TestCase {
+            input: "5876543210",
+            expected_type: PhoneType::Mobile10Digit,
+            should_be_valid: true,
+            description: "Valid mobile (starts with 5)",
         },
     ];
 
@@ -707,6 +749,12 @@ fn run_scanning_tests() {
             description: "Formatted in text",
         },
         TestCase {
+            input: "Contact: 123-456-7890 or 987-654-3210",
+            expected_count: 2,
+            expected_types: vec![PhoneType::FormattedDomestic, PhoneType::FormattedDomestic],
+            description: "Multiple formatted numbers",
+        },
+        TestCase {
             input: "My number is +91 9876543210",
             expected_count: 1,
             expected_types: vec![PhoneType::InternationalPlus],
@@ -719,10 +767,108 @@ fn run_scanning_tests() {
             description: "Mixed formats",
         },
         TestCase {
+            input: "Plain number: 2345678901",
+            expected_count: 1,
+            expected_types: vec![PhoneType::Plain10Digit],
+            description: "Plain 10 digit",
+        },
+        TestCase {
+            input: "No phone numbers here!",
+            expected_count: 0,
+            expected_types: vec![],
+            description: "No phones",
+        },
+        TestCase {
             input: "Number with spaces: 99887 76655",
             expected_count: 1,
             expected_types: vec![PhoneType::Mobile10Digit],
             description: "Space-separated mobile",
+        },
+        TestCase {
+            input: "Spaced format: 998 877 6655",
+            expected_count: 1,
+            expected_types: vec![PhoneType::Mobile10Digit],
+            description: "Triple-spaced mobile",
+        },
+        TestCase {
+            input: "Pair spacing: 99 88 77 66 55",
+            expected_count: 1,
+            expected_types: vec![PhoneType::Mobile10Digit],
+            description: "Pair-spaced mobile",
+        },
+        TestCase {
+            input: "Single spacing: 9 9 8 8 7 7 6 6 5 5",
+            expected_count: 1,
+            expected_types: vec![PhoneType::Mobile10Digit],
+            description: "Single-digit spacing",
+        },
+        TestCase {
+            input: "International spaced: +123 9 9 8 8 7 7 6 6 5 5",
+            expected_count: 1,
+            expected_types: vec![PhoneType::InternationalPlus],
+            description: "Intl with single-digit spacing",
+        },
+        TestCase {
+            input: "International pairs: +12 99 88 77 66 55",
+            expected_count: 1,
+            expected_types: vec![PhoneType::InternationalPlus],
+            description: "Intl with pair spacing",
+        },
+        TestCase {
+            input: "International triple: +123 99 88 77 66 55",
+            expected_count: 1,
+            expected_types: vec![PhoneType::InternationalPlus],
+            description: "Intl with triple spacing",
+        },
+        TestCase {
+            input: "International group: +91 998 877 6655",
+            expected_count: 1,
+            expected_types: vec![PhoneType::InternationalPlus],
+            description: "Intl with group spacing",
+        },
+        TestCase {
+            input: "International extended: +911 998 877 6655",
+            expected_count: 1,
+            expected_types: vec![PhoneType::InternationalPlus],
+            description: "Intl extended with spacing",
+        },
+        TestCase {
+            input: r#"The project was a logistical nightmare, but Sarah was determined to see it through. Organizing the international tech summit meant juggling time zones, vendors, and the very particular demands of keynote speakers. Her desk was a chaotic collage of sticky notes, each one bearing a name and a number that was crucial to the event's success. Her first call of the day was to the main venue's event manager. She quickly dialed the local landline, 456-7890, a number she now knew by heart. "Hi, David, it's Sarah again," she began, launching into a series of questions about stage lighting."#,
+            expected_count: 0,
+            expected_types: vec![],
+            description: "Story: 7-digit number (not detected)",
+        },
+        TestCase {
+            input: r#"Next on the list was confirming the travel arrangements for Dr. Alistair Finch, a renowned AI researcher based in London. His assistant had emailed his direct line, and Sarah carefully typed +44 20 7946 0123 into her phone. The international dialing tone was a familiar sound by now. Thankfully, the call was brief and successful. With that checked off, she turned her attention to catering. The local company she was using was fantastic, and their coordinator, Priya, was always responsive. She sent a quick text to her mobile, 98765 43210, to confirm the final headcount for the welcome dinner."#,
+            expected_count: 2,
+            expected_types: vec![PhoneType::InternationalPlus, PhoneType::Mobile10Digit],
+            description: "Story: International and spaced mobile",
+        },
+        TestCase {
+            input: r#"The summit's biggest draw was a tech mogul flying in from California. Coordinating with his team was a challenge in itself. Sarah found the number for his chief of staff on a crumpled napkin from a previous meeting: +1 (415) 555-0182. She hoped he would pick up. While waiting for a call back, she tackled the marketing side. They had set up a toll-free hotline for registration inquiries, and she made a test call to 1-800-555-0199 to check the automated message. Everything seemed to be working perfectly."#,
+            expected_count: 2,
+            expected_types: vec![PhoneType::InternationalPlus, PhoneType::FormattedTollFree],
+            description: "Story: International and toll-free",
+        },
+        TestCase {
+            input: r#"Her final task for the morning was to sort out a last-minute request for a specialized drone camera. An old colleague had recommended a boutique rental firm in Sydney. He had scribbled the number on a business card: +61 2 9876 5432. It was late in Australia, but she decided to leave a voicemail. As she hung up, her phone buzzed with a message from a local volunteer. The text was simple: "All set for tomorrow. My backup number is 99887 76655 if you can't reach me on the main one." Sarah sighed, a mix of exhaustion and relief. With so many moving parts, every confirmed detail, every answered call to a number like 212-555-2368, was a small victory. The summit was just days away, and this complex web of digits was the invisible thread holding it all together."#,
+            expected_count: 3,
+            expected_types: vec![
+                PhoneType::InternationalPlus,
+                PhoneType::Mobile10Digit,
+                PhoneType::FormattedDomestic,
+            ],
+            description: "Story: International, spaced mobile, and formatted",
+        },
+        TestCase {
+            input: "Support: (234) 567-8900, Sales: +1-345-678-9012, India: +91-9123456789",
+            expected_count: 3,
+            expected_types: vec![
+                PhoneType::FormattedDomestic,
+                PhoneType::InternationalPlus,
+                PhoneType::InternationalPlus,
+            ],
+            description: "Multiple international",
         },
     ];
 
@@ -786,14 +932,30 @@ fn run_performance_benchmark() {
     println!("=== PERFORMANCE BENCHMARK ===");
     println!("{}", "=".repeat(100));
 
+    let long_string_test_case = format!(
+        "{}{}{}",
+        "x".repeat(1000),
+        "(234) 567-8900",
+        "y".repeat(1000)
+    );
+
     let test_cases = vec![
         "Call me at (123) 456-7890",
         "Contact: +1 234-567-8900",
         "Mobile: 9876543210",
         "Multiple: (234) 567-8900 and +91-9123456789",
+        "Plain: 2345678901",
+        "No phones here at all",
+        r#"Story paragraph with various phone formats and numbers"#,
+        r#"The project was a logistical nightmare, but Sarah was determined to see it through. Organizing the international tech summit meant juggling time zones, vendors, and the very particular demands of keynote speakers. Her desk was a chaotic collage of sticky notes, each one bearing a name and a number that was crucial to the event's success. Her first call of the day was to the main venue's event manager. She quickly dialed the local landline, 456-7890, a number she now knew by heart. "Hi, David, it's Sarah again," she began, launching into a series of questions about stage lighting."#,
+        r#"Next on the list was confirming the travel arrangements for Dr. Alistair Finch, a renowned AI researcher based in London. His assistant had emailed his direct line, and Sarah carefully typed +44 20 7946 0123 into her phone. The international dialing tone was a familiar sound by now. Thankfully, the call was brief and successful. With that checked off, she turned her attention to catering. The local company she was using was fantastic, and their coordinator, Priya, was always responsive. She sent a quick text to her mobile, 98765 43210, to confirm the final headcount for the welcome dinner."#,
+        r#"The summit's biggest draw was a tech mogul flying in from California. Coordinating with his team was a challenge in itself. Sarah found the number for his chief of staff on a crumpled napkin from a previous meeting: +1 (415) 555-0182. She hoped he would pick up. While waiting for a call back, she tackled the marketing side. They had set up a toll-free hotline for registration inquiries, and she made a test call to 1-800-555-0199 to check the automated message. Everything seemed to be working perfectly."#,
+        r#"Her final task for the morning was to sort out a last-minute request for a specialized drone camera. An old colleague had recommended a boutique rental firm in Sydney. He had scribbled the number on a business card: +61 2 9876 5432. It was late in Australia, but she decided to leave a voicemail. As she hung up, her phone buzzed with a message from a local volunteer. The text was simple: "All set for tomorrow. My backup number is 99887 76655 if you can't reach me on the main one." Sarah sighed, a mix of exhaustion and relief. With so many moving parts, every confirmed detail, every answered call to a number like 212-555-2368, was a small victory. The summit was just days away, and this complex web of digits was the invisible thread holding it all together."#,
         "Business: (345) 678-9012 or +1-456-789-0123",
+        &long_string_test_case,
+        "Service: 234-567-8900, support: +1-345-678-9012",
     ];
-    
+
     let num_threads = num_cpus::get();
     let iterations_per_thread = 100_000;
 

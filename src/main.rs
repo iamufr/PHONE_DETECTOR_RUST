@@ -1682,83 +1682,299 @@ fn run_scanning_tests() {
     );
 }
 
+use std::sync::atomic::AtomicI64;
+use std::thread; // Added for the benchmark counters
+
 fn run_performance_benchmark() {
     println!("\n{}", "=".repeat(100));
-    println!("=== PERFORMANCE BENCHMARK ===");
-    println!("{}", "=".repeat(100));
+    println!("=== COMPREHENSIVE PHONE SCANNER BENCHMARK ===");
+    println!("{}\n", "=".repeat(100));
 
-    let long_string_test_case = format!(
+    // Define the test cases (Mixed formats, noise, edge cases)
+    let long_string_test_case: String = format!(
         "{}{}{}",
         "x".repeat(1000),
         "(234) 567-8900",
         "y".repeat(1000)
     );
 
-    let test_cases = vec![
-        "Call me at (123) 456-7890",
-        "Contact: +1 234-567-8900",
-        "Mobile: 9876543210",
-        "Multiple: (234) 567-8900 and +91-9123456789",
-        "Plain: 2345678901",
-        "No phones here at all",
-        r#"Story paragraph with various phone formats and numbers"#,
-        r#"The project was a logistical nightmare, but Sarah was determined to see it through. Organizing the international tech summit meant juggling time zones, vendors, and the very particular demands of keynote speakers. Her desk was a chaotic collage of sticky notes, each one bearing a name and a number that was crucial to the event's success. Her first call of the day was to the main venue's event manager. She quickly dialed the local landline, 456-7890, a number she now knew by heart. "Hi, David, it's Sarah again," she began, launching into a series of questions about stage lighting."#,
-        r#"Next on the list was confirming the travel arrangements for Dr. Alistair Finch, a renowned AI researcher based in London. His assistant had emailed his direct line, and Sarah carefully typed +44 20 7946 0123 into her phone. The international dialing tone was a familiar sound by now. Thankfully, the call was brief and successful. With that checked off, she turned her attention to catering. The local company she was using was fantastic, and their coordinator, Priya, was always responsive. She sent a quick text to her mobile, 98765 43210, to confirm the final headcount for the welcome dinner."#,
-        r#"The summit's biggest draw was a tech mogul flying in from California. Coordinating with his team was a challenge in itself. Sarah found the number for his chief of staff on a crumpled napkin from a previous meeting: +1 (415) 555-0182. She hoped he would pick up. While waiting for a call back, she tackled the marketing side. They had set up a toll-free hotline for registration inquiries, and she made a test call to 1-800-555-0199 to check the automated message. Everything seemed to be working perfectly."#,
-        r#"Her final task for the morning was to sort out a last-minute request for a specialized drone camera. An old colleague had recommended a boutique rental firm in Sydney. He had scribbled the number on a business card: +61 2 9876 5432. It was late in Australia, but she decided to leave a voicemail. As she hung up, her phone buzzed with a message from a local volunteer. The text was simple: "All set for tomorrow. My backup number is 99887 76655 if you can't reach me on the main one." Sarah sighed, a mix of exhaustion and relief. With so many moving parts, every confirmed detail, every answered call to a number like 212-555-2368, was a small victory. The summit was just days away, and this complex web of digits was the invisible thread holding it all together."#,
-        "Business: (345) 678-9012 or +1-456-789-0123",
-        &long_string_test_case,
-        "Service: 234-567-8900, support: +1-345-678-9012",
+    let test_cases: Vec<String> = vec![
+        "Call me at (123) 456-7890 for details.".to_string(),
+        "International: +1 234-567-8900 and +44 20 7123 4567".to_string(),
+        "Standard plain: 1234567890".to_string(),
+        "Dashed: 123-456-7890".to_string(),
+        "Dotted: 123.456.7890".to_string(),
+        "No numbers here at all, just text.".to_string(),
+        "Edge: (012) 345-6789 (Invalid Area Code)".to_string(),
+        "Mobile India: +91 9876543210".to_string(),
+        "Mixed: Call 123-456-7890 or 9876543210 today.".to_string(),
+        "Spaced: 9 9 8 8 7 7 6 6 5 5".to_string(),
+        "Complex: text... (123) 456-7890 ...more text".to_string(),
+        "Garbage: 8745^&%^&% (234) 567-8900 %^&%^&".to_string(),
+        "Short: 123".to_string(),
+        "Almost phone: 123-456-78".to_string(),
+        "Toll free: 1-800-555-0199".to_string(),
+        "With Extension: (123) 456-7890 ext 123".to_string(), // Scanner should catch the phone part
+        "User input: my number is 99887 76655".to_string(),
+        "Formatted text: [Phone] (555) 123-4567".to_string(),
+        "Two Intl: +1-202-555-0143 and +49-30-123456".to_string(),
+        "Parens: (555)1234567".to_string(),
+        "Plus start: +12345678901".to_string(),
+        "Leading 1: 12345678901".to_string(),
+        "Messy: (  123  )  456  -  7890".to_string(),
+        "Just digits: 9876543210".to_string(),
+        "Call me at (123) 456-7890".to_string(),
+        "Contact: +1 234-567-8900".to_string(),
+        "Mobile: 9876543210".to_string(),
+        "Multiple: (234) 567-8900 and +91-9123456789".to_string(),
+        "Plain: 2345678901".to_string(),
+        "No phones here at all".to_string(),
+        r#"Story paragraph with various phone formats and numbers"#.to_string(),
+        r#"The project was a logistical nightmare, but Sarah was determined to see it through. Organizing the international tech summit meant juggling time zones, vendors, and the very particular demands of keynote speakers. Her desk was a chaotic collage of sticky notes, each one bearing a name and a number that was crucial to the event's success. Her first call of the day was to the main venue's event manager. She quickly dialed the local landline, 456-7890, a number she now knew by heart. "Hi, David, it's Sarah again," she began, launching into a series of questions about stage lighting."#.to_string(),
+        r#"Next on the list was confirming the travel arrangements for Dr. Alistair Finch, a renowned AI researcher based in London. His assistant had emailed his direct line, and Sarah carefully typed +44 20 7946 0123 into her phone. The international dialing tone was a familiar sound by now. Thankfully, the call was brief and successful. With that checked off, she turned her attention to catering. The local company she was using was fantastic, and their coordinator, Priya, was always responsive. She sent a quick text to her mobile, 98765 43210, to confirm the final headcount for the welcome dinner."#.to_string(),
+        r#"The summit's biggest draw was a tech mogul flying in from California. Coordinating with his team was a challenge in itself. Sarah found the number for his chief of staff on a crumpled napkin from a previous meeting: +1 (415) 555-0182. She hoped he would pick up. While waiting for a call back, she tackled the marketing side. They had set up a toll-free hotline for registration inquiries, and she made a test call to 1-800-555-0199 to check the automated message. Everything seemed to be working perfectly."#.to_string(),
+        r#"Her final task for the morning was to sort out a last-minute request for a specialized drone camera. An old colleague had recommended a boutique rental firm in Sydney. He had scribbled the number on a business card: +61 2 9876 5432. It was late in Australia, but she decided to leave a voicemail. As she hung up, her phone buzzed with a message from a local volunteer. The text was simple: "All set for tomorrow. My backup number is 99887 76655 if you can't reach me on the main one." Sarah sighed, a mix of exhaustion and relief. With so many moving parts, every confirmed detail, every answered call to a number like 212-555-2368, was a small victory. The summit was just days away, and this complex web of digits was the invisible thread holding it all together."#.to_string(),
+        "Business: (345) 678-9012 or +1-456-789-0123".to_string(),
+        long_string_test_case,
+        "Service: 234-567-8900, support: +1-345-678-9012".to_string(),
     ];
 
-    let num_threads = num_cpus::get();
+    // Wrap test cases in Arc to share them safely across threads
+    let test_cases = Arc::new(test_cases);
+
+    let num_threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
     let iterations_per_thread = 100_000;
+    let num_test_cases = test_cases.len();
+    let total_ops_per_method =
+        (num_threads as i64) * (iterations_per_thread as i64) * (num_test_cases as i64);
 
-    println!("Threads: {}", num_threads);
-    println!("Iterations per thread: {}", iterations_per_thread);
-    println!("Test cases: {}", test_cases.len());
-    println!(
-        "Total operations: {}\n",
-        num_threads * iterations_per_thread * test_cases.len()
-    );
-    println!("Starting benchmark...\n");
+    println!("Configuration:");
+    println!("   Threads: {}", num_threads);
+    println!("   Iterations per thread: {}", iterations_per_thread);
+    println!("   Test cases: {}", num_test_cases);
+    println!("   Total operations per method: {}", total_ops_per_method);
 
-    let total_phones_found = AtomicU64::new(0);
-    let start = Instant::now();
+    // ============================================================================
+    // BENCHMARK 1: is_valid() - Strict Validation (Formatted Domestic)
+    // ============================================================================
+    println!("\n{}", "-".repeat(100));
+    println!("BENCHMARK 1: is_valid() - Strict Validation (Formatted Domestic)");
+    println!("{}", "-".repeat(100));
+    {
+        let start = Instant::now();
+        let valid_count = Arc::new(AtomicI64::new(0));
+        let mut threads = Vec::new();
 
-    std::thread::scope(|s| {
         for _ in 0..num_threads {
-            s.spawn(|| {
-                let scanner = PhoneScanner::new();
-                let mut local_phones_found = 0u64;
+            let test_cases_clone = Arc::clone(&test_cases);
+            let valid_count_clone = Arc::clone(&valid_count);
+
+            threads.push(thread::spawn(move || {
+                // Testing specifically the FormattedDomesticValidator logic
+                let local_validator = PhoneDetectorFactory::create_formatted_domestic_validator();
+                let mut local_valid = 0;
 
                 for _ in 0..iterations_per_thread {
-                    for test in &test_cases {
-                        let matches = scanner.extract(test);
-                        local_phones_found += matches.len() as u64;
+                    for test in test_cases_clone.iter() {
+                        if local_validator.is_valid(test) {
+                            local_valid += 1;
+                        }
                     }
                 }
-
-                total_phones_found.fetch_add(local_phones_found, Ordering::Relaxed);
-            });
+                valid_count_clone.fetch_add(local_valid, Ordering::Relaxed);
+            }));
         }
-    });
 
-    let duration = start.elapsed();
-    let total_ops = (num_threads * iterations_per_thread * test_cases.len()) as u64;
+        for handle in threads {
+            handle.join().unwrap();
+        }
 
+        let duration = start.elapsed();
+        let duration_ms = duration.as_millis() as i64;
+
+        println!("Time: {} ms", duration_ms);
+        println!("Operations: {}", total_ops_per_method);
+        println!(
+            "Throughput: {} ops/sec",
+            (total_ops_per_method * 1000) / (duration_ms + 1)
+        );
+        println!(
+            "Valid domestic phones: {}",
+            valid_count.load(Ordering::Relaxed)
+        );
+        println!(
+            "Avg latency: {:.2} ns/op\n",
+            (duration.as_nanos() as f64) / (total_ops_per_method as f64)
+        );
+    }
+
+    // ============================================================================
+    // BENCHMARK 2: contains() - Fast Phone Detection
+    // ============================================================================
     println!("{}", "-".repeat(100));
-    println!("RESULTS:");
+    println!("BENCHMARK 2: contains() - Fast Phone Detection");
     println!("{}", "-".repeat(100));
-    println!("Time: {} ms", duration.as_millis());
-    println!(
-        "Ops/sec: {}",
-        total_ops * 1000 / duration.as_millis().max(1) as u64
-    );
-    println!(
-        "Total phones found: {}",
-        total_phones_found.load(Ordering::Relaxed)
-    );
+    {
+        let start = Instant::now();
+        let found_count = Arc::new(AtomicI64::new(0));
+        let mut threads = Vec::new();
+
+        for _ in 0..num_threads {
+            let test_cases_clone = Arc::clone(&test_cases);
+            let found_count_clone = Arc::clone(&found_count);
+
+            threads.push(thread::spawn(move || {
+                let local_scanner = PhoneDetectorFactory::create_scanner_service();
+                let mut local_found = 0;
+
+                for _ in 0..iterations_per_thread {
+                    for test in test_cases_clone.iter() {
+                        if local_scanner.contains(test) {
+                            local_found += 1;
+                        }
+                    }
+                }
+                found_count_clone.fetch_add(local_found, Ordering::Relaxed);
+            }));
+        }
+
+        for handle in threads {
+            handle.join().unwrap();
+        }
+
+        let duration = start.elapsed();
+        let duration_ms = duration.as_millis() as i64;
+
+        println!("Time: {} ms", duration_ms);
+        println!("Operations: {}", total_ops_per_method);
+        println!(
+            "Throughput: {} ops/sec",
+            (total_ops_per_method * 1000) / (duration_ms + 1)
+        );
+        println!("Texts with phones: {}", found_count.load(Ordering::Relaxed));
+        println!(
+            "Avg latency: {:.2} ns/op\n",
+            (duration.as_nanos() as f64) / (total_ops_per_method as f64)
+        );
+    }
+
+    // ============================================================================
+    // BENCHMARK 3: extract() - Full Phone Extraction
+    // ============================================================================
+    println!("{}", "-".repeat(100));
+    println!("BENCHMARK 3: extract() - Full Phone Extraction");
+    println!("{}", "-".repeat(100));
+    {
+        let start = Instant::now();
+        let extracted_count = Arc::new(AtomicI64::new(0));
+        let mut threads = Vec::new();
+
+        for _ in 0..num_threads {
+            let test_cases_clone = Arc::clone(&test_cases);
+            let extracted_count_clone = Arc::clone(&extracted_count);
+
+            threads.push(thread::spawn(move || {
+                let local_scanner = PhoneDetectorFactory::create_scanner_service();
+                let mut local_extracted = 0;
+
+                for _ in 0..iterations_per_thread {
+                    for test in test_cases_clone.iter() {
+                        let phones = local_scanner.extract(test);
+                        local_extracted += phones.len() as i64;
+                    }
+                }
+                extracted_count_clone.fetch_add(local_extracted, Ordering::Relaxed);
+            }));
+        }
+
+        for handle in threads {
+            handle.join().unwrap();
+        }
+
+        let duration = start.elapsed();
+        let duration_ms = duration.as_millis() as i64;
+
+        println!("Time: {} ms", duration_ms);
+        println!("Operations: {}", total_ops_per_method);
+        println!(
+            "Throughput: {} ops/sec",
+            (total_ops_per_method * 1000) / (duration_ms + 1)
+        );
+        println!(
+            "Phones extracted: {}",
+            extracted_count.load(Ordering::Relaxed)
+        );
+        println!(
+            "Avg latency: {:.2} ns/op\n",
+            (duration.as_nanos() as f64) / (total_ops_per_method as f64)
+        );
+    }
+
+    // ============================================================================
+    // BENCHMARK 4: Combined Workload (Real-world scenario)
+    // ============================================================================
+    println!("{}", "-".repeat(100));
+    println!("BENCHMARK 4: Combined Workload (Real-world)");
+    println!("{}", "-".repeat(100));
+    {
+        let start = Instant::now();
+        let total_operations = Arc::new(AtomicI64::new(0));
+        let mut threads = Vec::new();
+
+        for _ in 0..num_threads {
+            let test_cases_clone = Arc::clone(&test_cases);
+            let total_operations_clone = Arc::clone(&total_operations);
+
+            threads.push(thread::spawn(move || {
+                let local_scanner = PhoneDetectorFactory::create_scanner_service();
+                let local_validator = PhoneDetectorFactory::create_international_validator();
+                let mut local_ops = 0;
+
+                for _ in 0..iterations_per_thread {
+                    for test in test_cases_clone.iter() {
+                        // Real-world pattern: check first, extract if found
+                        if local_scanner.contains(test) {
+                            let phones = local_scanner.extract(test);
+                            local_ops += phones.len() as i64;
+                        }
+
+                        // Also run a specific validation check simulating form input
+                        if local_validator.is_valid(test) {
+                            local_ops += 1;
+                        }
+                    }
+                }
+                total_operations_clone.fetch_add(local_ops, Ordering::Relaxed);
+            }));
+        }
+
+        for handle in threads {
+            handle.join().unwrap();
+        }
+
+        let duration = start.elapsed();
+        let duration_ms = duration.as_millis() as i64;
+
+        println!("Time: {} ms", duration_ms);
+        println!("Operations: {}", total_ops_per_method);
+        println!(
+            "Throughput: {} ops/sec",
+            (total_ops_per_method * 1000) / (duration_ms + 1)
+        );
+        println!(
+            "Results produced: {}",
+            total_operations.load(Ordering::Relaxed)
+        );
+        println!(
+            "Avg latency: {:.2} ns/op\n",
+            (duration.as_nanos() as f64) / (total_ops_per_method as f64)
+        );
+    }
+
+    println!("{}", "=".repeat(100));
+    println!("✓ Performance Benchmark Complete");
     println!("{}\n", "=".repeat(100));
 }
 
